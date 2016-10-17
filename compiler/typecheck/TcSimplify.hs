@@ -1093,11 +1093,6 @@ solveWanteds :: WantedConstraints -> TcS WantedConstraints
 solveWanteds wc@(WC { wc_simple = simples, wc_insol = insols, wc_impl = implics })
   = do { traceTcS "solveWanteds {" (ppr wc)
 
-         -- Try the simple bit, including insolubles. Solving insolubles a
-         -- second time round is a bit of a waste; but the code is simple
-         -- and the program is wrong anyway, and we don't run the danger
-         -- of adding Derived insolubles twice; see
-         -- TcSMonad Note [Do not add duplicate derived insolubles]
        ; wc1 <- solveSimpleWanteds simples
        ; (no_new_scs, wc1) <- expandSuperClasses wc1
        ; let WC { wc_simple = simples1, wc_insol = insols1, wc_impl = implics1 } = wc1
@@ -1765,29 +1760,6 @@ beta! Concrete example is in indexed_types/should_fail/ExtraTcsUntch.hs:
             g2 z = case z of TEx y -> (h [[undefined]], op x [y])
         in (g1 '3', g2 undefined)
 
-
-Note [Solving Family Equations]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-After we are done with simplification we may be left with constraints of the form:
-     [Wanted] F xis ~ beta
-If 'beta' is a touchable unification variable not already bound in the TyBinds
-then we'd like to create a binding for it, effectively "defaulting" it to be 'F xis'.
-
-When is it ok to do so?
-    1) 'beta' must not already be defaulted to something. Example:
-
-           [Wanted] F Int  ~ beta   <~ Will default [beta := F Int]
-           [Wanted] F Char ~ beta   <~ Already defaulted, can't default again. We
-                                       have to report this as unsolved.
-
-    2) However, we must still do an occurs check when defaulting (F xis ~ beta), to
-       set [beta := F xis] only if beta is not among the free variables of xis.
-
-    3) Notice that 'beta' can't be bound in ty binds already because we rewrite RHS
-       of type family equations. See Inert Set invariants in TcInteract.
-
-This solving is now happening during zonking, see Note [Unflattening while zonking]
-in TcMType.
 
 
 *********************************************************************************
