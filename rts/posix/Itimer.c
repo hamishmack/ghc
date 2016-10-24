@@ -25,7 +25,7 @@
  * a pthreads-based implementation. It may be to do with interference with the
  * signals of the debugger. Revisit. See #7723.
  */
-#if defined(ios_HOST_OS)
+#if defined(ios_HOST_OS) && defined(THREADED_RTS)
 #define USE_PTHREAD_FOR_ITIMER
 #endif
 

@@ -1638,7 +1638,9 @@ freePreloadObjectFile (ObjectCode *oc)
 #else
 
     if (RTS_LINKER_USE_MMAP && oc->imageMapped) {
+#if RTS_LINKER_USE_MMAP
         munmap(oc->image, oc->fileSize);
+#endif
     }
     else {
         stgFree(oc->image);
@@ -2801,6 +2803,7 @@ static int ocAllocateSymbolExtras( ObjectCode* oc, int count, int first )
   size_t n;
 
   if (RTS_LINKER_USE_MMAP && USE_CONTIGUOUS_MMAP) {
+#if RTS_LINKER_USE_MMAP && USE_CONTIGUOUS_MMAP
       n = roundUpToPage(oc->fileSize);
 
       /* Keep image and symbol_extras contiguous */
@@ -2820,6 +2823,7 @@ static int ocAllocateSymbolExtras( ObjectCode* oc, int count, int first )
           oc->symbol_extras = NULL;
           return 0;
       }
+#endif
   }
   else if( count > 0 ) {
     if (RTS_LINKER_USE_MMAP) {
