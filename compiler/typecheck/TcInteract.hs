@@ -133,16 +133,14 @@ that prepareInertsForImplications will discard the insolubles, so we
 must keep track of them separately.
 -}
 
-solveSimpleGivens :: [Ct] -> TcS Cts
+solveSimpleGivens :: [Ct] -> TcS ()
 solveSimpleGivens givens
   | null givens  -- Shortcut for common case
-  = return emptyCts
+  = return ()
   | otherwise
   = do { traceTcS "solveSimpleGivens {" (ppr givens)
        ; go givens
-       ; given_insols <- takeGivenInsolubles
-       ; traceTcS "End solveSimpleGivens }" (text "Insoluble:" <+> pprCts given_insols)
-       ; return given_insols }
+       ; traceTcS "End solveSimpleGivens }" empty }
   where
     go givens = do { solveSimples (listToBag givens)
                    ; new_givens <- runTcPluginsGiven
@@ -894,15 +892,15 @@ improveLocalFunEqs loc inerts fam_tc args fsk
   = do { traceTcS "interactFunEq improvements: " $
          vcat [ text "Eqns:" <+> ppr improvement_eqns
               , text "Candidates:" <+> ppr funeqs_for_tc
-              , text "Model:" <+> ppr model ]
+              , text "Inert eqs:" <+> ppr ieqs ]
        ; mapM_ (unifyDerived loc Nominal) improvement_eqns }
   | otherwise
   = return ()
   where
-    model         = inert_model inerts
+    ieqs          = inert_eqs inerts
     funeqs        = inert_funeqs inerts
     funeqs_for_tc = findFunEqsByTyCon funeqs fam_tc
-    rhs           = lookupFlattenTyVar model fsk
+    rhs           = lookupFlattenTyVar ieqs fsk
 
     --------------------
     improvement_eqns
@@ -919,14 +917,14 @@ improveLocalFunEqs loc inerts fam_tc args fsk
 
     --------------------
     do_one_built_in ops (CFunEqCan { cc_tyargs = iargs, cc_fsk = ifsk })
-      = sfInteractInert ops args rhs iargs (lookupFlattenTyVar model ifsk)
+      = sfInteractInert ops args rhs iargs (lookupFlattenTyVar ieqs ifsk)
     do_one_built_in _ _ = pprPanic "interactFunEq 1" (ppr fam_tc)
 
     --------------------
     -- See Note [Type inference for type families with injectivity]
     do_one_injective injective_args
                     (CFunEqCan { cc_tyargs = iargs, cc_fsk = ifsk })
-      | rhs `tcEqType` lookupFlattenTyVar model ifsk
+      | rhs `tcEqType` lookupFlattenTyVar ieqs ifsk
       = [Pair arg iarg | (arg, iarg, True)
                            <- zip3 args iargs injective_args ]
       | otherwise
@@ -934,12 +932,12 @@ improveLocalFunEqs loc inerts fam_tc args fsk
     do_one_injective _ _ = pprPanic "interactFunEq 2" (ppr fam_tc)
 
 -------------
-lookupFlattenTyVar :: InertModel -> TcTyVar -> TcType
+lookupFlattenTyVar :: DTyVarEnv EqualCtList -> TcTyVar -> TcType
 -- See Note [lookupFlattenTyVar]
 lookupFlattenTyVar model ftv
   = case lookupDVarEnv model ftv of
-      Just (CTyEqCan { cc_rhs = rhs, cc_eq_rel = NomEq }) -> rhs
-      _                                                   -> mkTyVarTy ftv
+      Just (CTyEqCan { cc_rhs = rhs, cc_eq_rel = NomEq } : _ ) -> rhs
+      _                                                        -> mkTyVarTy ftv
 
 reactFunEq :: CtEvidence -> TcTyVar    -- From this  :: F args1 ~ fsk1
            -> CtEvidence -> TcTyVar    -- Solve this :: F args2 ~ fsk2
@@ -1291,11 +1289,21 @@ doTopReactDict inerts work_item@(CDictCan { cc_ev = fl, cc_class = cls
   = do { try_fundep_improvement
        ; continueWith work_item }
 
+  | isDerived fl
+  = do { try_fundep_improvement
+       ; continueWith work_item }
+
   | Just ev <- lookupSolvedDict inerts cls xis   -- Cached
   = do { setEvBindIfWanted fl (ctEvTerm ev)
        ; stopWith fl "Dict/Top (cached)" }
 
-  | isDerived fl  -- Use type-class instances for Deriveds, in the hope
+  | isDerived fl
+  = do { try_fundep_improvement
+       ; continueWith work_item }
+
+{-  Don't bother; see typecheck/should_compile/Improvement.hs
+
+                  -- Use type-class instances for Deriveds, in the hope
                   -- of generating some improvements
                   -- C.f. Example 3 of Note [The improvement story]
                   -- It's easy because no evidence is involved
@@ -1312,6 +1320,7 @@ doTopReactDict inerts work_item@(CDictCan { cc_ev = fl, cc_class = cls
                  do { -- If there is no instance, try improvement
                       try_fundep_improvement
                     ; continueWith work_item } }
+-}
 
   | otherwise  -- Wanted, but not cached
    = do { dflags <- getDynFlags
@@ -1445,10 +1454,12 @@ reduce_top_fun_eq old_ev fsk ax_co rhs_ty
 
 improveTopFunEqs :: CtLoc -> TyCon -> [TcType] -> TcTyVar -> TcS ()
 improveTopFunEqs loc fam_tc args fsk
-  = do { model <- getInertModel
+  = do { ieqs <- getInertEqs
        ; fam_envs <- getFamInstEnvs
        ; eqns <- improve_top_fun_eqs fam_envs fam_tc args
-                                    (lookupFlattenTyVar model fsk)
+                                    (lookupFlattenTyVar ieqs fsk)
+       ; traceTcS "improveTopFunEqs" (vcat [ ppr fam_tc <+> ppr args <+> ppr fsk
+                                          , ppr eqns ])
        ; mapM_ (unifyDerived loc Nominal) eqns }
 
 improve_top_fun_eqs :: FamInstEnvs

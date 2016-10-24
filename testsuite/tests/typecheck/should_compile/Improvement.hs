@@ -14,5 +14,9 @@ blug = error "Urk"
 
 foo :: Bool
 foo = blug undefined
+
+-- This one relies on doing instance reduction
+-- on a derived class
+
 -- [W] C (F a0) a0, F a0 ~ Bool
 

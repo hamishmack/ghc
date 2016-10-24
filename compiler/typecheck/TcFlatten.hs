@@ -1164,8 +1164,7 @@ flatten_exact_fam_app_fully tc tys
                 do { let fam_ty = mkTyConApp tc xis
                    ; (ev, co, fsk) <- newFlattenSkolemFlatM fam_ty
                    ; let fsk_ty = mkTyVarTy fsk
-                   ; liftTcS $ extendFlatCache tc xis ( co
-                                                      , fsk_ty, ctEvFlavour ev)
+                   ; liftTcS $ extendFlatCache tc xis ( co, fsk_ty, ctEvFlavour ev)
 
                    -- The new constraint (F xis ~ fsk) is not necessarily inert
                    -- (e.g. the LHS may be a redex) so we must put it in the work list
@@ -1329,7 +1328,8 @@ flatten_tyvar2 :: TcTyVar -> CtFlavourRole -> FlatM FlattenTvResult
 -- See Definition [Applying a generalised substitution] in TcSMonad
 -- See Note [Stability of flattening] in TcSMonad
 
-flatten_tyvar2 tv fr@(flavour, eq_rel)
+flatten_tyvar2 tv fr@(_, eq_rel)
+{-
   | Derived <- flavour  -- For derived equalities, consult the inert_model (only)
   = do { model <- liftTcS $ getInertModel
        ; case lookupDVarEnv model tv of
@@ -1339,6 +1339,7 @@ flatten_tyvar2 tv fr@(flavour, eq_rel)
            _ -> return FTRNotFollowed }
 
   | otherwise   -- For non-derived equalities, consult the inert_eqs (only)
+-}
   = do { ieqs <- liftTcS $ getInertEqs
        ; case lookupDVarEnv ieqs tv of
            Just (ct:_)   -- If the first doesn't work,
