@@ -106,13 +106,13 @@ instance Show CostCentre where show _ = "CostCentre"
 instance Show CostCentre.CostCentre where show _ = "CostCentre"
 instance Show CostCentreStack where show _ = "CostCentreStack"
 -- instance Show StgBinderInfo where show _ = "StgBinderInfo"
-instance Show Module where show m = unitIdString (moduleUnitId m) ++ ":" ++ moduleNameString (moduleName m)
+showModule m = unitIdString (moduleUnitId m) ++ ":" ++ moduleNameString (moduleName m)
 -- instance Show (UniqFM Id) where show u = "[" ++ show (uniqSetToList u) ++ "]"
 instance Show TyCon where show = show . tyConName
 instance Show Name where
   show n = case nameModule_maybe n of
                   Nothing -> show (nameOccName n)
-                  Just m  -> show m ++ "." ++ show (nameOccName n)
+                  Just m  -> showModule m ++ "." ++ show (nameOccName n)
 instance Show OccName where show = occNameString
 instance Show DataCon where show d = show (dataConName d)
 instance Show Var where show v = "(" ++ show (Var.varName v) ++ "[" ++
@@ -145,18 +145,12 @@ deriving instance Show CCallTarget
 deriving instance Show CCallSpec
 deriving instance Show CCallConv
 deriving instance Show FunctionOrData
-deriving instance Show a => Show (Tickish a)
 --
 instance Show Coercion where show co = showPpr hackPprDflags co
-deriving instance Show a => Show (Expr a)
-deriving instance Show a => Show (Bind a)
 deriving instance Show LeftOrRight
 deriving instance Show Role
 deriving instance Show UnfoldingGuidance
 deriving instance Show UnfoldingSource
-deriving instance Show Unfolding
-deriving instance (Show bndr, Show annot) => Show (AnnBind bndr annot)
-deriving instance (Show bndr, Show annot) => Show (AnnExpr' bndr annot)
 instance Show elem => Show (UniqDSet elem) where
   show = show . uniqDSetToList
 
